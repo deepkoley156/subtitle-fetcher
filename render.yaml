@@ -1,1 +1,12 @@
-
+services:
+  - type: web
+    name: subtitle-fetcher
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
