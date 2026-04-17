@@ -1,1 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Subtitle Downloader</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
+    body {
+      font-family: Arial, sans-serif;
+      background: #f6f7fb;
+      color: #111827;
+      padding: 30px 16px;
+    }
+
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      color: #4b5563;
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+
+    .note {
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      color: #9a3412;
+      padding: 12px 14px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    input {
+      flex: 1;
+      min-width: 260px;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid #d1d5db;
+      font-size: 15px;
+      outline: none;
+    }
+
+    button {
+      padding: 14px 18px;
+      border: none;
+      border-radius: 12px;
+      background: #111827;
+      color: #fff;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    button:hover {
+      opacity: 0.92;
+    }
+
+    .status {
+      margin-top: 16px;
+      font-size: 15px;
+    }
+
+    .results {
+      margin-top: 22px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .item {
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 16px;
+      background: #fafafa;
+    }
+
+    .item h3 {
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    .meta {
+      font-size: 13px;
+      color: #6b7280;
+      word-break: break-all;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .actions a {
+      display: inline-block;
+      padding: 10px 14px;
+      border-radius: 10px;
+      text-decoration: none;
+      background: #111827;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .actions a.secondary {
+      background: #374151;
+    }
+
+    .footer {
+      margin-top: 18px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    @media (max-width: 640px) {
+      h1 {
+        font-size: 24px;
+      }
+      .card {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Subtitle Downloader</h1>
+      <p>Paste a public video page URL. The tool will try to find subtitle files like .vtt or .srt and let you download them.</p>
+
+      <div class="note">
+        Best for public pages with visible subtitle tracks. It may not work on DRM, login-only, or protected streaming websites.
+      </div>
+
+      <div class="row">
+        <input id="pageUrl" type="text" placeholder="Paste public video page URL here" />
+        <button id="findBtn">Find Subtitles</button>
+      </div>
+
+      <div class="status" id="status"></div>
+      <div class="results" id="results"></div>
+
+      <div class="footer">
+        Supports original subtitle download and VTT to SRT conversion.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const findBtn = document.getElementById("findBtn");
+    const pageUrlInput = document.getElementById("pageUrl");
+    const statusBox = document.getElementById("status");
+    const resultsBox = document.getElementById("results");
+
+    function escapeHtml(str = "") {
+      return str
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    findBtn.addEventListener("click", async () => {
+      const pageUrl = pageUrlInput.value.trim();
+      resultsBox.innerHTML = "";
+
+      if (!pageUrl) {
+        statusBox.textContent = "Please enter a URL.";
+        return;
+      }
+
+      statusBox.textContent = "Searching subtitle files...";
+
+      try {
+        const res = await fetch("/api/find-subtitles", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ pageUrl })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          statusBox.textContent = data.error || "Request failed.";
+          return;
+        }
+
+        if (!data.subtitles || data.subtitles.length === 0) {
+          statusBox.textContent = "No public subtitle track found on this page.";
+          return;
+        }
+
+        statusBox.textContent = `Found ${data.subtitles.length} subtitle track(s).`;
+
+        resultsBox.innerHTML = data.subtitles.map((item, index) => {
+          const encodedUrl = encodeURIComponent(item.url);
+          return `
+            <div class="item">
+              <h3>Subtitle ${index + 1}</h3>
+              <div class="meta">
+                <strong>Language:</strong> ${escapeHtml(item.lang || "unknown")}<br>
+                <strong>Source type:</strong> ${escapeHtml(item.type || "unknown")}<br>
+                <strong>URL:</strong> ${escapeHtml(item.url || "")}
+              </div>
+              <div class="actions">
+                <a href="/api/download?fileUrl=${encodedUrl}" target="_blank">Download Original</a>
+                <a class="secondary" href="/api/download?fileUrl=${encodedUrl}&format=srt" target="_blank">Download as SRT</a>
+              </div>
+            </div>
+          `;
+        }).join("");
+      } catch (error) {
+        statusBox.textContent = "Something went wrong.";
+      }
+    });
+  </script>
+</body>
+</html>
